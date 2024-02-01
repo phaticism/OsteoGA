@@ -1,3 +1,4 @@
+# OsteoGA
 ---
 title: Demo OsteoGA
 emoji: 🌖
@@ -10,5 +11,14 @@ pinned: false
 license: apache-2.0
 ---
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
-# OsteoGA
+## Setup
+```
+python3 -m venv .
+source bin/activate
+pip3 install -r requirements.txt
+```
+
+## Usage
+```
+streamlit run app.py
+```
