@@ -4,16 +4,13 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import gc
 import numpy as np
 from tqdm import tqdm
+from skimage import exposure
 import streamlit as st
 import matplotlib.pyplot as plt
 
 import matplotlib
 matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
-
-
-from skimage import exposure
-
 
 import tensorflow as tf
 import tensorflow_addons as tfa
@@ -123,6 +120,7 @@ def adjust_pretrained_weights(model_cls, input_size, name=None):
     if name:
         target_model._name = name
     return target_model
+
 
 from keras import backend as K
 def squeeze_excite_block(input, ratio=16):
@@ -443,6 +441,7 @@ class MultipleTrackers():
             return getattr(self, attr)
         else:
             return helper
+
 
 class DCGAN():
     def __init__(self,
