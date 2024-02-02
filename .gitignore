@@ -1,4 +1,3 @@
-# Python virtual environment
 bin
 etc
 include
@@ -6,3 +5,4 @@ lib
 share
 pyvenv.cfg
 archive
+__pycache__/

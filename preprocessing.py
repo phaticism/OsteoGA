@@ -446,6 +446,31 @@ def seg(img_path, model=seg_model, verbose=0, combine=False):
     return mask
 
 
+def segment(img_path, model=seg_model, verbose=0, combine=True):
+    img = cv2.imdecode(np.fromstring(img_path, np.uint8), 1)
+    # img = cv2.imdecode(np.frombuffer(img_path.read(), np.uint8), 1)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    eimg = cv2.equalizeHist(img)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    eimg = clahe.apply(eimg)
+    eimg = to_color(eimg)
+    res = seg_model(eimg, verbose=False)
+    mask = res[0].masks.data[0] * (res[0].boxes.cls[0] + 1) + res[0].masks.data[1] * (res[0].boxes.cls[1] + 1)
+    mask = mask.cpu().numpy()
+    if verbose == 1:
+        cv2_imshow(eimg)
+        cv2.imwrite('original.png', eimg)
+        cv2_imshow(combine_mask(eimg, mask))
+        plt.show()
+    if combine:
+        mask = combine_mask(eimg, mask)
+    s1 = np.sum(mask == 1)
+    s2 = np.sum(mask == 2)
+
+    return mask
+
+
 def split_img(img):
     img_size = img.shape
     return img[:, :(img_size[1] // 3), :], img[:, (img_size[1] // 3 * 2):, :]
