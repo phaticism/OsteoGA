@@ -1,22 +1,21 @@
-from preprocessing import segment, get_contours_v2, draw_points, dilate
 from DCGAN import DCGAN, DropBlockNoise
+from Preprocessing import segment, dilate, get_contours_v2, draw_points
 
 from skimage.filters import gaussian
 from flask import Flask, request, jsonify
 
 import tensorflow as tf
-import matplotlib
 import matplotlib.pyplot as plt
 
-import io
 import os
 import cv2
-import base64
+from base64 import b64encode, b64decode
 import numpy as np
 
 IMAGE_SIZE = 224
+WHITE = (255, 255, 255)
 
-dcgan = DCGAN(input_shape=(IMAGE_SIZE, IMAGE_SIZE, 1),
+model = DCGAN(input_shape=(IMAGE_SIZE, IMAGE_SIZE, 1),
               architecture='two-stage',
               output_activation='sigmoid',
               noise=DropBlockNoise(rate=0.1, block_size=16),
@@ -24,56 +23,53 @@ dcgan = DCGAN(input_shape=(IMAGE_SIZE, IMAGE_SIZE, 1),
               block_type='pixel-shuffle',
               kernel_initializer='glorot_uniform',
               C=1.)
-
-
-restore_model = dcgan.generator
-restore_model.load_weights("./weights_gae/gan_efficientunet_full_augment-hist_equal_generator.h5")
-restore_model.trainable = False
+restoration_model = model.generator
+restoration_model.load_weights("./weights_gae/gan_efficientunet_full_augment-hist_equal_generator.h5")
+restoration_model.trainable = False
 
 
 app = Flask(__name__)
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # visualise segmentation
-    img_bytes = base64.b64decode(request.json['image'])
-    img = cv2.cvtColor(cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1), cv2.COLOR_BGR2GRAY) / 255.
+    img_bytes = b64decode(request.json['image']) # get image bytes
+    original = cv2.cvtColor(cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1), cv2.COLOR_BGR2GRAY) / 255. # convert to grayscale and normalise
+    
+    # do segmentation
     segmented_img = segment(img_bytes, combine=True)
-    segmented_str = base64.b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
+    segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
 
-    # visualise contours
+    # get contours
     uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=1)
-    mask = np.zeros((640, 640)).astype('uint8')
-    mask = draw_points(mask, lc, thickness=1, color=(255, 255, 255))
-    mask = draw_points(mask, uc, thickness=1, color=(255, 255, 255))
-    mask = cv2.resize(mask, (224, 224), cv2.INTER_NEAREST)
-    mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-    mask = mask / 255.
-    plt.imsave('contour.png', mask, cmap='gray')
-    contour_str = base64.b64encode(open('contour.png', 'rb').read()).decode()
-    os.remove('contour.png')
+    mask = draw_points(np.zeros((640, 640)).astype('uint8'), lc, thickness=1, color=WHITE)
+    mask = draw_points(mask, uc, thickness=1, color=WHITE)
+    mask = cv2.cvtColor(cv2.resize(mask, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST), cv2.COLOR_BGR2GRAY) / 255.
+    ok, buffer = cv2.imencode(".png", (mask * 255).astype('uint8'))
+    if ok:
+        contour_str = b64encode(buffer).decode()
 
-    # visualise masked image
+    # create masked image
     mask = 1 - mask
     dilated = gaussian(dilate(mask), sigma=50, truncate=0.3)
-    im = np.expand_dims(img * (1 - dilated), axis=0)
-    im = tf.convert_to_tensor(im, dtype=tf.float32)
-    plt.imsave('masked.png', im[0], cmap='gray')
-    masked_str = base64.b64encode(open('masked.png', 'rb').read()).decode()
-    os.remove('masked.png')
+    masked_img = original * (1 - dilated)
+    ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
+    if ok:
+        masked_str = b64encode(buffer).decode()
 
+    # restore masked image using generator
+    input = tf.convert_to_tensor(np.expand_dims(masked_img, axis=0), dtype=tf.float32)
+    restored_img = restoration_model(input)
+    restored_img = tf.squeeze(tf.squeeze(restored_img, axis=-1), axis=0)
+    ok, buffer = cv2.imencode(".png", (restored_img * 255).numpy().astype('uint8'))
+    if ok:
+        restored_str = b64encode(buffer).decode()
 
-    # restore masked image
-    restored_img = restore_model(im)
-    res = tf.squeeze(tf.squeeze(restored_img, axis=-1), axis=0)
-    plt.imsave('restored.png', res, cmap='gray')
-    restored_str = base64.b64encode(open('restored.png', 'rb').read()).decode()
-    os.remove('restored.png')
-
-    # visualise anomaly
-    plt.imsave('anomaly.png', dilated*tf.abs(img - res), cmap='turbo')
-    anomaly_str = base64.b64encode(open('anomaly.png', 'rb').read()).decode()
+    # evaluate anomaly map
+    anomaly_map = dilated * tf.abs(original - restored_img)
+    plt.imsave('anomaly.png', anomaly_map, cmap='turbo')
+    anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
     os.remove('anomaly.png')
+
 
     return jsonify({
         'segmented': segmented_str, 
@@ -84,4 +80,4 @@ def predict():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
