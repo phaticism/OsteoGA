@@ -3,7 +3,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import cv2
 import random
-
 import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
@@ -14,7 +13,6 @@ from skimage import exposure
 import matplotlib
 matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
-
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
@@ -29,12 +27,13 @@ seg_model = YOLO(yolo_weight)
 
 # đảo màu những ảnh bị ngược màu
 def remove_negative(img):
-  outside = np.mean(img[ : , 0])
-  inside = np.mean(img[ : , int(IMAGE_SIZE / 2)])
-  if outside < inside:
-    return img
-  else:
-    return 1 - img
+    outside = np.mean(img[ : , 0])
+    inside = np.mean(img[ : , int(IMAGE_SIZE / 2)])
+    if outside < inside:
+        return img
+    else:
+        return 1 - img
+
 
 # lựa chọn tiền xử lý: ảnh gốc, Equalization histogram, CLAHE
 def preprocess(img):
@@ -45,11 +44,13 @@ def preprocess(img):
     img = exposure.equalize_hist(img)
     return img
 
+
 # dilate contour
 def dilate(mask_img):
     kernel_size = 2 * 22 + 1
     kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
     return ndimage.binary_dilation(mask_img == 0, structure=kernel)
+
 
 def find_boundaries(mask, start, end, top=True, verbose=0):
     #     nếu top = True, tìm đường bao bên trên cùng từ left đến right
