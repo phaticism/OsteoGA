@@ -8,6 +8,9 @@ import numpy as np
 import streamlit as st
 import matplotlib.pyplot as plt
 
+from scipy import ndimage
+from skimage import exposure
+
 import matplotlib
 matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
@@ -24,6 +27,30 @@ NUM_CLASSES = 3
 
 yolo_weight = './weights_yolo/oai_s_best4.pt'
 seg_model = YOLO(yolo_weight)
+
+# đảo màu những ảnh bị ngược màu
+def remove_negative(img):
+  outside = np.mean(img[ : , 0])
+  inside = np.mean(img[ : , int(IMAGE_SIZE / 2)])
+  if outside < inside:
+    return img
+  else:
+    return 1 - img
+
+# lựa chọn tiền xử lý: ảnh gốc, Equalization histogram, CLAHE
+def preprocess(img):
+    img = remove_negative(img)
+
+    img = exposure.equalize_hist(img)
+    img = exposure.equalize_adapthist(img)
+    img = exposure.equalize_hist(img)
+    return img
+
+# dilate contour
+def dilate(mask_img):
+    kernel_size = 2 * 22 + 1
+    kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+    return ndimage.binary_dilation(mask_img == 0, structure=kernel)
 
 def find_boundaries(mask, start, end, top=True, verbose=0):
     #     nếu top = True, tìm đường bao bên trên cùng từ left đến right
@@ -532,7 +559,7 @@ def get_contours_v2(mask, verbose=0):
         plt.imshow(temp)
         plt.axis('off')
         plt.show()
-        st.pyplot()
+        # st.pyplot()
         temp = draw_points(127 * mask, upper_contour, thickness=3, color=(255, 0, 0))
         temp = draw_points(temp, lower_contour, thickness=3)
         cv2_imshow(temp)

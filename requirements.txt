@@ -16,3 +16,4 @@ scikit-learn
 ultralytics
 streamlit
 Pillow
+Flask
