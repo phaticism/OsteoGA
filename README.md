@@ -1,15 +1,4 @@
 # OsteoGA
----
-title: Demo OsteoGA
-emoji: 🌖
-colorFrom: purple
-colorTo: blue
-sdk: streamlit
-sdk_version: 1.29.0
-app_file: app.py
-pinned: false
-license: apache-2.0
----
 
 ## Setup
 ```
@@ -19,6 +8,12 @@ pip3 install -r requirements.txt
 ```
 
 ## Usage
+Terminal 1
 ```
-streamlit run app.py
+python3 server.py
+```
+
+Terminal 2
+```
+python3 test.py
 ```
