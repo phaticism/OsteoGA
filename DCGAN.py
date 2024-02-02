@@ -1,5 +1,5 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import gc
 import numpy as np
@@ -40,7 +40,6 @@ from tensorflow.keras.applications import (
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
 import ultralytics
-ultralytics.checks()
 from ultralytics import YOLO
 
 IMAGE_SIZE = 224

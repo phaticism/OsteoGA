@@ -8,6 +8,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import cv2
 from base64 import b64encode, b64decode
 import numpy as np
@@ -80,4 +81,4 @@ def predict():
     })
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)

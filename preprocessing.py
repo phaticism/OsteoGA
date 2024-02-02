@@ -1,5 +1,5 @@
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import cv2
 import random
@@ -19,7 +19,6 @@ matplotlib.use('Agg')
 st.set_option('deprecation.showPyplotGlobalUse', False)
 
 import ultralytics
-ultralytics.checks()
 from ultralytics import YOLO
 
 IMAGE_SIZE = 224
