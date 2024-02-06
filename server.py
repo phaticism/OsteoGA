@@ -1,8 +1,9 @@
 from DCGAN import DCGAN, DropBlockNoise
-from Preprocessing import segment, dilate, get_contours_v2, draw_points
+from preprocessing import segment, dilate, get_contours_v2, draw_points
 
 from skimage.filters import gaussian
 from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -30,12 +31,16 @@ restoration_model.trainable = False
 
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}})
+app.config['CORS_HEADERS'] = 'Content-Type'
+
 
 @app.route('/predict', methods=['POST'])
+@cross_origin()
 def predict():
+    print("Request received", request.json['image'][:10])
     img_bytes = b64decode(request.json['image']) # get image bytes
-    original = cv2.cvtColor(cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1), cv2.COLOR_BGR2GRAY) / 255. # convert to grayscale and normalise
-    
+    original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1) / 255.    
     # do segmentation
     segmented_img = segment(img_bytes, combine=True)
     segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()

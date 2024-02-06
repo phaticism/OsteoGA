@@ -17,3 +17,4 @@ ultralytics
 streamlit
 Pillow
 Flask
+flask-cors
