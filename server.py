@@ -41,7 +41,7 @@ def predict():
     segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
 
     # get contours
-    uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=1)
+    uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=0)
     mask = draw_points(np.zeros((640, 640)).astype('uint8'), lc, thickness=1, color=WHITE)
     mask = draw_points(mask, uc, thickness=1, color=WHITE)
     mask = cv2.cvtColor(cv2.resize(mask, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST), cv2.COLOR_BGR2GRAY) / 255.
