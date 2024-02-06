@@ -13,7 +13,7 @@ matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
 
 import tensorflow as tf
-import tensorflow_addons as tfa
+# import tensorflow_addons as tfa
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.__internal__.layers import BaseRandomLayer
@@ -419,10 +419,10 @@ def inv_msssim_l1(y_true, y_pred, alpha=0.8):
     return alpha*inv_msssim(y_true, y_pred) + (1-alpha)*mae(y_true, y_pred)
 
 
-def inv_msssim_gaussian_l1(y_true, y_pred, alpha=0.8):
-    l1_diff = tf.abs(y_true-y_pred)
-    gaussian_l1 = tfa.image.gaussian_filter2d(l1_diff, filter_shape=(11, 11), sigma=1.5)
-    return alpha*inv_msssim(y_true, y_pred) + (1-alpha)*gaussian_l1
+# def inv_msssim_gaussian_l1(y_true, y_pred, alpha=0.8):
+#     l1_diff = tf.abs(y_true-y_pred)
+#     gaussian_l1 = tfa.image.gaussian_filter2d(l1_diff, filter_shape=(11, 11), sigma=1.5)
+#     return alpha*inv_msssim(y_true, y_pred) + (1-alpha)*gaussian_l1
 
 
 def psnr(y_true, y_pred):
