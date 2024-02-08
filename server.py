@@ -1,5 +1,5 @@
 from DCGAN import DCGAN, DropBlockNoise
-from preprocessing import segment, dilate, get_contours_v2, draw_points
+from Preprocessing import segment, dilate, get_contours_v2, draw_points
 
 from skimage.filters import gaussian
 from flask import Flask, request, jsonify

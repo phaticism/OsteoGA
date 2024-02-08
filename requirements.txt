@@ -1,9 +1,6 @@
 keras-core
 tensorflow
-tensorflow-addons
-tf-clahe
 opencv-python
-tf_clahe
 numpy
 pandas
 array-record
