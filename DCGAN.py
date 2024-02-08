@@ -5,7 +5,6 @@ import gc
 import numpy as np
 from tqdm import tqdm
 from skimage import exposure
-import streamlit as st
 import matplotlib.pyplot as plt
 
 import matplotlib
@@ -13,7 +12,6 @@ matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
 
 import tensorflow as tf
-# import tensorflow_addons as tfa
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.__internal__.layers import BaseRandomLayer
@@ -33,8 +31,6 @@ from tensorflow.keras.applications import (
     EfficientNetV2S, EfficientNetV2B3, ResNet50, ConvNeXtBase,
     RegNetX032
 )
-
-st.set_option('deprecation.showPyplotGlobalUse', False)
 
 import ultralytics
 from ultralytics import YOLO

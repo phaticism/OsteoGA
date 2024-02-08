@@ -4,7 +4,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import cv2
 import random
 import numpy as np
-import streamlit as st
 import matplotlib.pyplot as plt
 
 from scipy import ndimage
@@ -13,8 +12,6 @@ from skimage import exposure
 import matplotlib
 matplotlib.rcParams['savefig.pad_inches'] = 0
 matplotlib.use('Agg')
-
-st.set_option('deprecation.showPyplotGlobalUse', False)
 
 import ultralytics
 from ultralytics import YOLO
@@ -126,8 +123,6 @@ def cv2_imshow(images):
             plt.imshow(image, cmap='gray')
 
         plt.axis("off")
-        # plt.show()
-        plt.savefig('temp.png')
     else:
         # Hiển thị nhiều ảnh trên cùng một cột
         fig, ax = plt.subplots(num_images, 1, figsize=(4, 4 * num_images))
@@ -145,8 +140,6 @@ def cv2_imshow(images):
             ax[i].axis("off")
 
         plt.tight_layout()
-        # plt.show()
-        plt.savefig('temp.png')
 
 
 def to_color(image):

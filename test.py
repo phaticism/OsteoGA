@@ -7,6 +7,8 @@ import numpy as np
 
 
 img = cv2.imread('archive/val/4/9070207R.png')
+# convert to grayscale
+img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 
 # Send it to the server
