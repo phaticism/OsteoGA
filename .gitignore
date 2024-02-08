@@ -7,5 +7,5 @@ share
 pyvenv.cfg
 archive
 .DS_Store
-__pycache__/
+**/__pycache__/
 Scripts/
