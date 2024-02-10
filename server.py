@@ -34,6 +34,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
+def simulate():
+    return np.random.dirichlet(np.ones(3), size=1).squeeze()
+
 
 @app.route('/predict', methods=['POST'])
 @cross_origin()
@@ -76,13 +79,15 @@ def predict():
     anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
     os.remove('anomaly.png')
 
-
     return jsonify({
-        'segmented': segmented_str, 
-        'contour': contour_str,
-        'masked': masked_str,
-        'restored': restored_str,
-        'anomaly': anomaly_str,
+        'images': {
+            'segmented': segmented_str, 
+            'contour': contour_str,
+            'masked': masked_str,
+            'restored': restored_str,
+            'anomaly': anomaly_str,
+        },
+        'probabilities': simulate().tolist(),
     })
 
 if __name__ == '__main__':

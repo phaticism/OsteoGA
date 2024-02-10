@@ -15,7 +15,7 @@ img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 r = requests.post('http://127.0.0.1:5000/predict', json={'image': img_str})
 
 # Read the response
-imgs = r.json()
+imgs = r.json()['images']
 
 segmented_img = base64.b64decode(imgs['segmented'])
 contour_img = base64.b64decode(imgs['contour'])
@@ -36,3 +36,5 @@ cv2.imwrite('debug/contour.png', contour_img)
 cv2.imwrite('debug/masked.png', masked_img)
 cv2.imwrite('debug/restored.png', restored_img)
 cv2.imwrite('debug/anomaly.png', anomaly_img)
+
+print(r.json()['probabilities'])
