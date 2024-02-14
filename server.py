@@ -2,7 +2,7 @@ from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
 
 from skimage.filters import gaussian
-from flask import Flask, request, jsonify
+from flask import Flask, request, make_response, jsonify
 from flask_cors import CORS, cross_origin
 
 import tensorflow as tf
@@ -41,48 +41,72 @@ def simulate():
 @app.route('/predict', methods=['POST'])
 @cross_origin()
 def predict():
-    print("Request received", request.json['image'][:10])
-    img_bytes = b64decode(request.json['image']) # get image bytes
-    original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
-    if len(original.shape) == 3 and original.shape[2] == 3:
-        # Convert the image to grayscale
-        original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
-
-    original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
-    # do segmentation
-    segmented_img = cv2.resize(segment(img_bytes, combine=True), (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST)
-    segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
+    print("Request received", request.json['image'][-10:])
+    try:
+        img_bytes = b64decode(request.json['image']) # get image bytes
+        original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
+        # convert to grayscale if necessary
+        if len(original.shape) == 3 and original.shape[2] == 3:
+            original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+        original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Invalid input format'}), 400)
+    
+    # perform segmentation
+    try:
+        segmented_img = cv2.resize(segment(img_bytes, combine=True), (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST)
+        segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Segmentation failed'}), 500)
 
     # get contours
-    uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=0)
-    mask = draw_points(np.zeros((640, 640)).astype('uint8'), lc, thickness=1, color=WHITE)
-    mask = draw_points(mask, uc, thickness=1, color=WHITE)
-    mask = cv2.cvtColor(cv2.resize(mask, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST), cv2.COLOR_BGR2GRAY) / 255.
-    ok, buffer = cv2.imencode(".png", (mask * 255).astype('uint8'))
-    if ok:
-        contour_str = b64encode(buffer).decode()
+    try:
+        uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=0)
+        mask = draw_points(np.zeros((640, 640)).astype('uint8'), lc, thickness=1, color=WHITE)
+        mask = draw_points(mask, uc, thickness=1, color=WHITE)
+        mask = cv2.cvtColor(cv2.resize(mask, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST), cv2.COLOR_BGR2GRAY) / 255.
+        ok, buffer = cv2.imencode(".png", (mask * 255).astype('uint8'))
+        if ok:
+            contour_str = b64encode(buffer).decode()
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Contour extraction failed'}), 500)
 
     # create masked image
-    mask = 1 - mask
-    dilated = gaussian(dilate(mask), sigma=50, truncate=0.3)
-    masked_img = original * (1 - dilated)
-    ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
-    if ok:
-        masked_str = b64encode(buffer).decode()
+    try:
+        mask = 1 - mask
+        dilated = gaussian(dilate(mask), sigma=50, truncate=0.3)
+        masked_img = original * (1 - dilated)
+        ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
+        if ok:
+            masked_str = b64encode(buffer).decode()
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Masking failed'}), 500)
 
     # restore masked image using generator
-    input = tf.convert_to_tensor(np.expand_dims(masked_img, axis=0), dtype=tf.float32)
-    restored_img = restoration_model(input)
-    restored_img = tf.squeeze(tf.squeeze(restored_img, axis=-1), axis=0)
-    ok, buffer = cv2.imencode(".png", (restored_img * 255).numpy().astype('uint8'))
-    if ok:
-        restored_str = b64encode(buffer).decode()
+    try:
+        input = tf.convert_to_tensor(np.expand_dims(masked_img, axis=0), dtype=tf.float32)
+        restored_img = restoration_model(input)
+        restored_img = tf.squeeze(tf.squeeze(restored_img, axis=-1), axis=0)
+        ok, buffer = cv2.imencode(".png", (restored_img * 255).numpy().astype('uint8'))
+        if ok:
+            restored_str = b64encode(buffer).decode()
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Restoration failed'}), 500)
 
     # evaluate anomaly map
-    anomaly_map = dilated * tf.abs(original - restored_img)
-    plt.imsave('anomaly.png', anomaly_map, cmap='turbo')
-    anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
-    os.remove('anomaly.png')
+    try:
+        anomaly_map = dilated * tf.abs(original - restored_img)
+        plt.imsave('anomaly.png', anomaly_map, cmap='turbo')
+        anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
+        os.remove('anomaly.png')
+    except Exception as e:
+        print(e)
+        return make_response(jsonify({'error': 'Anomaly map evaluation failed'}), 500)
 
     return jsonify({
         'images': {
