@@ -1,5 +1,5 @@
 from DCGAN import DCGAN, DropBlockNoise
-from Preprocessing import segment, dilate, get_contours_v2, draw_points
+from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
 
 from skimage.filters import gaussian
 from flask import Flask, request, jsonify
@@ -43,9 +43,14 @@ def simulate():
 def predict():
     print("Request received", request.json['image'][:10])
     img_bytes = b64decode(request.json['image']) # get image bytes
-    original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1) / 255.    
+    original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
+    if len(original.shape) == 3 and original.shape[2] == 3:
+        # Convert the image to grayscale
+        original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+
+    original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
     # do segmentation
-    segmented_img = segment(img_bytes, combine=True)
+    segmented_img = cv2.resize(segment(img_bytes, combine=True), (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST)
     segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
 
     # get contours
