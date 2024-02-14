@@ -12,7 +12,7 @@ img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 
 # Send it to the server
-r = requests.post('http://127.0.0.1:5000/predict', json={'image': img_str})
+r = requests.post('http://localhost:8000/predict', json={'image': img_str})
 
 # Read the response
 imgs = r.json()['images']

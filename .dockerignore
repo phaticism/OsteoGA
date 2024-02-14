@@ -1,0 +1,11 @@
+bin
+etc
+debug
+include
+lib
+share
+pyvenv.cfg
+archive
+.DS_Store
+**/__pycache__/
+Scripts/
