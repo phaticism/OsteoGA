@@ -14,6 +14,10 @@ import cv2
 from base64 import b64encode, b64decode
 import numpy as np
 
+import logging
+logger = logging.getLogger('app')
+logger.setLevel(logging.INFO)
+
 IMAGE_SIZE = 224
 WHITE = (255, 255, 255)
 
@@ -41,7 +45,7 @@ def simulate():
 @app.route('/predict', methods=['POST'])
 @cross_origin()
 def predict():
-    print("Request received", request.json['image'][-10:])
+    logger.info(f'Request received: {request.json["image"][-10:]}')
     try:
         img_bytes = b64decode(request.json['image']) # get image bytes
         original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
@@ -50,7 +54,7 @@ def predict():
             original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
         original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Invalid input format'}), 400)
     
     # perform segmentation
@@ -58,7 +62,7 @@ def predict():
         segmented_img = cv2.resize(segment(img_bytes, combine=True), (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST)
         segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Segmentation failed'}), 500)
 
     # get contours
@@ -71,7 +75,7 @@ def predict():
         if ok:
             contour_str = b64encode(buffer).decode()
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Contour extraction failed'}), 500)
 
     # create masked image
@@ -83,7 +87,7 @@ def predict():
         if ok:
             masked_str = b64encode(buffer).decode()
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Masking failed'}), 500)
 
     # restore masked image using generator
@@ -95,7 +99,7 @@ def predict():
         if ok:
             restored_str = b64encode(buffer).decode()
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Restoration failed'}), 500)
 
     # evaluate anomaly map
@@ -105,9 +109,10 @@ def predict():
         anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
         os.remove('anomaly.png')
     except Exception as e:
-        print(e)
+        logger.error(e)
         return make_response(jsonify({'error': 'Anomaly map evaluation failed'}), 500)
-
+    
+    logger.info('Request processed successfully!')
     return jsonify({
         'images': {
             'segmented': segmented_str, 
