@@ -81,8 +81,17 @@ def predict():
     # create masked image
     try:
         mask = 1 - mask
-        dilated = gaussian(dilate(mask), sigma=50, truncate=0.3)
-        masked_img = original * (1 - dilated)
+        dilated = dilate(mask)
+        ok, buffer = cv2.imencode(".png", (dilated * 255).astype('uint8'))
+        if ok:
+            dilated_str = b64encode(buffer).decode()
+        
+        blurred = gaussian(dilated, sigma=50, truncate=0.3)
+        ok, buffer = cv2.imencode(".png", (blurred * 255).astype('uint8'))
+        if ok:
+            blurred_str = b64encode(buffer).decode()
+
+        masked_img = original * (1 - blurred)
         ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
         if ok:
             masked_str = b64encode(buffer).decode()
@@ -104,7 +113,7 @@ def predict():
 
     # evaluate anomaly map
     try:
-        anomaly_map = dilated * tf.abs(original - restored_img)
+        anomaly_map = blurred * tf.abs(original - restored_img)
         plt.imsave('anomaly.png', anomaly_map, cmap='turbo')
         anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
         os.remove('anomaly.png')
@@ -117,6 +126,8 @@ def predict():
         'images': {
             'segmented': segmented_str, 
             'contour': contour_str,
+            'dilated': dilated_str,
+            'blurred': blurred_str,
             'masked': masked_str,
             'restored': restored_str,
             'anomaly': anomaly_str,
