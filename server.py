@@ -1,5 +1,8 @@
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
+from Classifier import adjust_pretrained_weights, input_shape, NUM_CLASSES, BACKBONES
+from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense
+from tensorflow.keras.models import Model
 
 from skimage.filters import gaussian
 from flask import Flask, request, make_response, jsonify
@@ -38,8 +41,20 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-def simulate():
-    return np.random.dirichlet(np.ones(3), size=1).squeeze()
+inputs = Input(shape=input_shape)
+backbone = adjust_pretrained_weights(BACKBONES['efficientnetv2s'], input_shape[:-1])
+img_ft = backbone(inputs)
+gpooling = GlobalAveragePooling2D()(img_ft)
+output = Dense(NUM_CLASSES, activation='softmax')(gpooling)
+
+MODEL_NAME = 'efficientnetv2s-3cls'
+classifier = Model(inputs, output, name=MODEL_NAME)
+
+classifier.load_weights('./weights_3cls/efficientnetv2s-3cls.h5')
+classifier.trainable = False
+
+def classify(image):
+    return classifier.predict(np.expand_dims(image, axis=0)).squeeze()
 
 
 @app.route('/predict', methods=['POST'])
@@ -53,6 +68,7 @@ def predict():
         if len(original.shape) == 3 and original.shape[2] == 3:
             original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
         original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
+        probabilities = classify(original)
     except Exception as e:
         logger.error(e)
         return make_response(jsonify({'error': 'Invalid input format'}), 400)
@@ -132,7 +148,7 @@ def predict():
             'restored': restored_str,
             'anomaly': anomaly_str,
         },
-        'probabilities': simulate().tolist(),
+        'probabilities': probabilities.tolist(),
     })
 
 if __name__ == '__main__':
