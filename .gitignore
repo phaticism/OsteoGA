@@ -9,3 +9,4 @@ archive
 .DS_Store
 **/__pycache__/
 Scripts/
+old/

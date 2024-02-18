@@ -10,9 +10,10 @@ import tensorflow as tf
 
 from tensorflow.keras import layers
 from tensorflow.keras.applications import (
-    InceptionResNetV2, DenseNet201, ResNet152V2,
-    EfficientNetV2M, ResNet50V2, Xception,
-    InceptionV3, EfficientNetV2S
+    InceptionResNetV2, DenseNet201, ResNet152V2, VGG19,
+    EfficientNetV2M, ResNet50V2, Xception, InceptionV3,
+    EfficientNetV2S, EfficientNetV2B3, ResNet50, ConvNeXtBase,
+    RegNetX032
 )
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import (
@@ -231,19 +232,23 @@ def ordinal_loss(y_true, y_pred):
 
 BACKBONES = {
     'xception': Xception,
+    'resnet50':ResNet50,
     'resnet50v2': ResNet50V2,
-    'resnet152v2': ResNet152V2,
+    'resnet152': ResNet152V2,
     'inceptionv3': InceptionV3,
+    "convnextb":ConvNeXtBase,
     'inception-resnetv2': InceptionResNetV2,
     'densenet201': DenseNet201,
     'efficientnetv2m': EfficientNetV2M,
-    'efficientnetv2s': EfficientNetV2S
+    'efficientnetv2s': EfficientNetV2S,
+    'regnetx32': RegNetX032
 }
 
 def get_by_backbone(backbone='xception',
                     input_shape=(224, 224, 1),
                     backbone_weights=None,
                     backbone_trainable=True,
+                    use_errors_branch=False,
                     errors_input_shape=None,
                     dropout_rate=0.0,
                     output_regularizers=None,
@@ -272,6 +277,12 @@ def get_by_backbone(backbone='xception',
     gpooling = GlobalAveragePooling2D(name='gpooling')(backbone_tensor)
     if dropout_rate > 0.:
         gpooling = Dropout(dropout_rate)(gpooling)
+    if use_errors_branch:
+        errors_branch = get_errors_branch(errors_input_shape)
+        inputs = [input_tensor, errors_branch.input]
+        gpooling = Dense(512, activation='relu', kernel_regularizer='l2')(gpooling)
+        concat_tensor = concatenate([gpooling, errors_branch.output])
+        output = Dense(NUM_CLASSES, activation='softmax')(concat_tensor)
     else:
         inputs = [input_tensor]
         output = Dense(NUM_CLASSES,
@@ -281,11 +292,13 @@ def get_by_backbone(backbone='xception',
     model = Model(inputs=inputs, outputs=output, name=name)
     return model
 
-main_model = get_by_backbone(backbone='efficientnetv2s',
+main_model = get_by_backbone(backbone='convnextb',
                              backbone_weights='imagenet',
                              backbone_trainable=True,
                              input_shape=(224, 224, 1),
-                             name='main')
-backbone = main_model.get_layer('efficientnetv2-s')
+                             use_errors_branch=False,
+                             name='origin')
+
+backbone = main_model.get_layer('convnext_base')
 
 input_shape = (224, 224, 1)

@@ -1,7 +1,13 @@
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
-from Classifier import adjust_pretrained_weights, input_shape, NUM_CLASSES, BACKBONES
-from tensorflow.keras.layers import Input, GlobalAveragePooling2D, Dense
+from Classifier import adjust_pretrained_weights, input_shape, NUM_CLASSES, BACKBONES, backbone
+from tensorflow.keras.layers import (
+    Dense, Flatten, Conv2D, Activation, BatchNormalization,
+    MaxPooling2D, AveragePooling2D, GlobalAveragePooling2D, Lambda,
+    Dropout, Input, concatenate, add, Conv2DTranspose,
+    SpatialDropout2D, Cropping2D, UpSampling2D, LeakyReLU,
+    ZeroPadding2D, Reshape, Concatenate, Multiply, Permute, Add
+)
 from tensorflow.keras.models import Model
 
 from skimage.filters import gaussian
@@ -41,16 +47,40 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-inputs = Input(shape=input_shape)
-backbone = adjust_pretrained_weights(BACKBONES['efficientnetv2s'], input_shape[:-1])
-img_ft = backbone(inputs)
-gpooling = GlobalAveragePooling2D()(img_ft)
-output = Dense(NUM_CLASSES, activation='softmax')(gpooling)
+inputs = Input(shape=(224, 224, 3))
+img_in = Lambda(lambda x: (x[..., 0]), name='img')(inputs)
+restore_in = Lambda(lambda x: x[..., 2], name='restore')(inputs)
 
-MODEL_NAME = 'efficientnetv2s-3cls'
+img_ft = backbone(img_in)
+restore_ft = backbone(restore_in)
+
+img_ft = BatchNormalization()(img_ft)
+img_ft = Activation('swish')(img_ft)
+
+restore_ft = BatchNormalization()(restore_ft)
+restore_ft = Activation('swish')(restore_ft)
+
+# x = tf.abs(img_ft - restore_ft)
+# restore_ft = backbone(error_in)
+
+x = tf.sqrt(tf.square(img_ft, restore_ft))
+x = Conv2D(1024, 3, padding='same')(x)
+x = BatchNormalization()(x)
+x = Activation('swish')(x)
+
+img_ft = Conv2D(1024, 3, padding='same')(img_ft)
+img_ft = BatchNormalization()(img_ft)
+img_ft = Activation('swish')(img_ft)
+
+gpooling = concatenate([img_ft, x])
+gpooling = GlobalAveragePooling2D()(gpooling)
+gpooling = Dropout(0.2)(gpooling)
+output = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer='l2')(gpooling)
+
+MODEL_NAME = 'convnext_base'
 classifier = Model(inputs, output, name=MODEL_NAME)
 
-classifier.load_weights('./weights_3cls/efficientnetv2s-3cls.h5')
+classifier.load_weights('./weights_3cls/convnext_base_best_val.h5')
 classifier.trainable = False
 
 def classify(image):
@@ -68,7 +98,6 @@ def predict():
         if len(original.shape) == 3 and original.shape[2] == 3:
             original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
         original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
-        probabilities = classify(original)
     except Exception as e:
         logger.error(e)
         return make_response(jsonify({'error': 'Invalid input format'}), 400)
@@ -136,6 +165,13 @@ def predict():
     except Exception as e:
         logger.error(e)
         return make_response(jsonify({'error': 'Anomaly map evaluation failed'}), 500)
+    
+    # classify the restored image
+    try:
+        probabilities = classify(np.stack((original, original, restored_img), axis=-1))
+    except Exception as e:
+        logger.error(e)
+        return make_response(jsonify({'error': 'Classification failed'}), 500)
     
     logger.info('Request processed successfully!')
     return jsonify({
