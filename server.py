@@ -60,10 +60,10 @@ img_ft = Activation('swish')(img_ft)
 restore_ft = BatchNormalization()(restore_ft)
 restore_ft = Activation('swish')(restore_ft)
 
-# x = tf.abs(img_ft - restore_ft)
+x = tf.abs(img_ft - restore_ft)
 # restore_ft = backbone(error_in)
 
-x = tf.sqrt(tf.square(img_ft, restore_ft))
+# x = add([img_ft, restore_ft])
 x = Conv2D(1024, 3, padding='same')(x)
 x = BatchNormalization()(x)
 x = Activation('swish')(x)

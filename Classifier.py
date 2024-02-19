@@ -286,7 +286,7 @@ def get_by_backbone(backbone='xception',
     else:
         inputs = [input_tensor]
         output = Dense(NUM_CLASSES,
-                       activation = 'softmax',
+                       activation = 'softmax', 
                        kernel_regularizer=output_regularizers)(gpooling)
 
     model = Model(inputs=inputs, outputs=output, name=name)
@@ -296,7 +296,9 @@ main_model = get_by_backbone(backbone='convnextb',
                              backbone_weights='imagenet',
                              backbone_trainable=True,
                              input_shape=(224, 224, 1),
+     #                         dropout_rate=0.3,
                              use_errors_branch=False,
+    #                          errors_input_shape=(64, 192, 1),
                              name='origin')
 
 backbone = main_model.get_layer('convnext_base')

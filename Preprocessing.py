@@ -35,9 +35,10 @@ def remove_negative(img):
 # lựa chọn tiền xử lý: ảnh gốc, Equalization histogram, CLAHE
 def preprocess(img):
     img = remove_negative(img)
-
-    img = exposure.equalize_hist(img)
     img = exposure.equalize_adapthist(img)
+    for i in range(0,2):
+        a = np.mean(img[img < np.mean(img)])
+        img[img < a] = img[img < a]/5
     img = exposure.equalize_hist(img)
     return img
 
