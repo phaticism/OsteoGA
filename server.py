@@ -80,7 +80,7 @@ output = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer='l2')(gpool
 MODEL_NAME = 'convnext_base'
 classifier = Model(inputs, output, name=MODEL_NAME)
 
-classifier.load_weights('./weights_3cls/convnext_base_best_val.h5')
+classifier.load_weights('./weights_3cls/convnext_base_best_loss.h5')
 classifier.trainable = False
 
 def classify(image):
