@@ -159,7 +159,7 @@ def predict():
     # evaluate anomaly map
     try:
         anomaly_map = blurred * tf.abs(original - restored_img)
-        plt.imsave('anomaly.png', anomaly_map, cmap='turbo')
+        plt.imsave('anomaly.png', anomaly_map, cmap='turbo', vmax=0.7)
         anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
         os.remove('anomaly.png')
     except Exception as e:
