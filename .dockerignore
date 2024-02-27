@@ -6,6 +6,7 @@ lib
 share
 pyvenv.cfg
 archive
+old
 .DS_Store
 **/__pycache__/
 Scripts/
