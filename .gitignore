@@ -10,4 +10,7 @@ archive
 **/__pycache__/
 Scripts/
 old/
-weights_3cls/convnext_base_best_loss.h5
+weights_3cls/
+weights_gae/
+weights_yolo/
+yolov5/
