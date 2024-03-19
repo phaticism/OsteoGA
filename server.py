@@ -1,3 +1,8 @@
+import logging
+import numpy as np
+from base64 import b64encode, b64decode
+import cv2
+import torch
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
 from Classifier import adjust_pretrained_weights, input_shape, NUM_CLASSES, BACKBONES, backbone
@@ -19,16 +24,21 @@ import matplotlib.pyplot as plt
 
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-import cv2
-from base64 import b64encode, b64decode
-import numpy as np
 
-import logging
 logger = logging.getLogger('app')
 logger.setLevel(logging.INFO)
 
 IMAGE_SIZE = 224
 WHITE = (255, 255, 255)
+
+
+def get_extraction_model():
+    model = torch.hub.load(
+        './yolov5', 'custom', path='./yolov5/runs/train/exp/weights/best.pt', source='local')
+    return model
+
+
+extraction_model = get_extraction_model()
 
 model = DCGAN(input_shape=(IMAGE_SIZE, IMAGE_SIZE, 1),
               architecture='two-stage',
@@ -39,7 +49,8 @@ model = DCGAN(input_shape=(IMAGE_SIZE, IMAGE_SIZE, 1),
               kernel_initializer='glorot_uniform',
               C=1.)
 restoration_model = model.generator
-restoration_model.load_weights("./weights_gae/gan_efficientunet_full_augment-hist_equal_generator.h5")
+restoration_model.load_weights(
+    "./weights_gae/gan_efficientunet_full_augment-hist_equal_generator.h5")
 restoration_model.trainable = False
 
 
@@ -61,9 +72,6 @@ restore_ft = BatchNormalization()(restore_ft)
 restore_ft = Activation('swish')(restore_ft)
 
 x = tf.abs(img_ft - restore_ft)
-# restore_ft = backbone(error_in)
-
-# x = add([img_ft, restore_ft])
 x = Conv2D(1024, 3, padding='same')(x)
 x = BatchNormalization()(x)
 x = Activation('swish')(x)
@@ -75,13 +83,15 @@ img_ft = Activation('swish')(img_ft)
 gpooling = concatenate([img_ft, x])
 gpooling = GlobalAveragePooling2D()(gpooling)
 gpooling = Dropout(0.2)(gpooling)
-output = Dense(NUM_CLASSES, activation='softmax', kernel_regularizer='l2')(gpooling)
+output = Dense(NUM_CLASSES, activation='softmax',
+               kernel_regularizer='l2')(gpooling)
 
 MODEL_NAME = 'convnext_base'
 classifier = Model(inputs, output, name=MODEL_NAME)
 
 classifier.load_weights('./weights_3cls/convnext_base_best_loss.h5')
 classifier.trainable = False
+
 
 def classify(image):
     return classifier.predict(np.expand_dims(image, axis=0)).squeeze()
@@ -92,8 +102,31 @@ def classify(image):
 def predict():
     logger.info(f'Request received: {request.json["image"][-10:]}')
     try:
-        img_bytes = b64decode(request.json['image']) # get image bytes
+        img_bytes = b64decode(request.json['image'])  # get image bytes
         original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
+
+        if request.json['crop'] == 'true':
+            results = extraction_model(original)
+            bboxes = results.pandas().xyxy[0].values.tolist()
+
+            if len(bboxes) == 0:
+                logger.info('No object detected!')
+                return make_response(jsonify({'error': 'No object detected'}), 400)
+            coordinates = []
+            for object in bboxes:
+                coordinates.append([int(object[0]), int(
+                    object[1]), int(object[2]), int(object[3])])
+
+            x1, y1, x2, y2 = coordinates[0][0:4]
+            cropped_image = original[y1:y2, x1:x2, ...]
+            cropped_image = cv2.resize(cropped_image, (224, 224))
+
+            cropped_str = b64encode(cv2.imencode(
+                '.png', cropped_image)[1]).decode()
+
+            original = cropped_image
+            img_bytes = b64decode(cropped_str)
+
         # convert to grayscale if necessary
         if len(original.shape) == 3 and original.shape[2] == 3:
             original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
@@ -176,7 +209,8 @@ def predict():
     logger.info('Request processed successfully!')
     return jsonify({
         'images': {
-            'segmented': segmented_str, 
+            'cropped': cropped_str if request.json['crop'] == 'true' else '',
+            'segmented': segmented_str,
             'contour': contour_str,
             'dilated': dilated_str,
             'blurred': blurred_str,
@@ -187,5 +221,6 @@ def predict():
         'probabilities': probabilities.tolist(),
     })
 
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=8000)
