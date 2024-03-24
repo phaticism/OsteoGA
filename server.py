@@ -101,6 +101,12 @@ def classify(image):
 @cross_origin()
 def predict():
     logger.info(f'Request received: {request.json["image"][-10:]}')
+
+    if 'crop' not in request.json:
+        request.json['crop'] = 'false'
+    else:
+        request.json['crop'] = request.json['crop'].lower()
+    
     try:
         img_bytes = b64decode(request.json['image'])  # get image bytes
         original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
