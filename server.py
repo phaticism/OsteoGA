@@ -207,9 +207,22 @@ def predict():
         return make_response(jsonify({'error': 'Classification failed'}), 500)
     
     logger.info('Request processed successfully!')
+    if request.json['crop'] == 'true':
+        return jsonify({
+            'images': {
+                'cropped': cropped_str,
+                'segmented': segmented_str,
+                'contour': contour_str,
+                'dilated': dilated_str,
+                'blurred': blurred_str,
+                'masked': masked_str,
+                'restored': restored_str,
+                'anomaly': anomaly_str,
+            },
+            'probabilities': probabilities.tolist(),
+        })
     return jsonify({
         'images': {
-            'cropped': cropped_str if request.json['crop'] == 'true' else '',
             'segmented': segmented_str,
             'contour': contour_str,
             'dilated': dilated_str,
