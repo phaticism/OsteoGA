@@ -1,5 +1,5 @@
 keras-core
-tensorflow
+tensorflow==2.12.1
 opencv-python
 numpy
 pandas
