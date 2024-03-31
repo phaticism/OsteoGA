@@ -6,13 +6,13 @@ import os
 import numpy as np
 
 
-img = cv2.imread('archive/train/1/9000622R.png')
+img = cv2.imread('my_image.png')
 # convert to grayscale
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 
 # Send it to the server
-r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'false'})
+r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'true'})
 
 # read the return value when code 400
 if r.status_code != 200:
