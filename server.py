@@ -96,12 +96,13 @@ classifier.trainable = False
 def classify(image):
     return classifier.predict(np.expand_dims(image, axis=0)).squeeze()
 
-def make_json_response(images_dict, probabilities, error):
-    return jsonify({
+def make_json_response_with_status(images_dict, probabilities, error, status_code):
+    response = jsonify({
         'images': images_dict,
-        'probabilities': probabilities.tolist(),
+        'probabilities': probabilities.tolist() if probabilities is not None else [],
         'error': error,
     })
+    return make_response(response, status_code)
 
 
 @app.route('/predict', methods=['POST'])
@@ -125,7 +126,7 @@ def predict():
 
             if len(bboxes) == 0:
                 logger.info('No object detected!')
-                return make_response(make_json_response(images_dict, [], 'no_object_detected'), 500)
+                return make_json_response_with_status(images_dict, [], 'no_object_detected', 500)
             coordinates = []
             for object in bboxes:
                 coordinates.append([int(object[0]), int(
@@ -148,7 +149,7 @@ def predict():
         original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'invalid_input_format'), 500)
+        return make_json_response_with_status(images_dict, [], 'invalid_input_format', 500)
     
     # perform segmentation
     try:
@@ -157,7 +158,7 @@ def predict():
         images_dict['segmented'] = segmented_str
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'segmentation_failed'), 500)
+        return make_json_response_with_status(images_dict, [], 'segmentation_failed', 500)
 
     # get contours
     try:
@@ -171,7 +172,7 @@ def predict():
             images_dict['contour'] = contour_str
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'contour_extraction_failed'), 500)
+        return make_json_response_with_status(images_dict, [], 'contour_extraction_failed', 500)
 
     # create masked image
     try:
@@ -195,7 +196,7 @@ def predict():
             images_dict['masked'] = masked_str
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'masking_failed'), 500)
+        return make_json_response_with_status(images_dict, [], 'masking_failed', 500)
 
     # restore masked image using generator
     try:
@@ -208,7 +209,7 @@ def predict():
             images_dict['restored'] = restored_str
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'restoration_failed'), 500)
+        return make_json_response_with_status(images_dict, [], 'restoration_failed', 500)
 
     # evaluate anomaly map
     try:
@@ -219,17 +220,17 @@ def predict():
         os.remove('anomaly.png')
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, [], 'anomaly_map_failed'), 500)
+        return make_json_response_with_status(images_dict, [], 'anomaly_map_failed', 500)
     
     # classify the restored image
     try:
         probabilities = classify(np.stack((original, original, restored_img), axis=-1))
     except Exception as e:
         logger.error(e)
-        return make_response(make_json_response(images_dict, probabilities, 'classification_failed'), 500)
+        return make_json_response_with_status(images_dict, probabilities, 'classification_failed', 500)
     
     logger.info('Request processed successfully!')
-    return make_response(make_json_response(images_dict, probabilities, None), 200)
+    return make_json_response_with_status(images_dict, probabilities, None, 200)
 
 
 if __name__ == '__main__':
