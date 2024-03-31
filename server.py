@@ -5,7 +5,7 @@ import cv2
 import torch
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
-from Classifier import adjust_pretrained_weights, input_shape, NUM_CLASSES, BACKBONES, backbone
+from Classifier import Classifier
 from tensorflow.keras.layers import (
     Dense, Flatten, Conv2D, Activation, BatchNormalization,
     MaxPooling2D, AveragePooling2D, GlobalAveragePooling2D, Lambda,
@@ -58,43 +58,9 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
-inputs = Input(shape=(224, 224, 3))
-img_in = Lambda(lambda x: (x[..., 0]), name='img')(inputs)
-restore_in = Lambda(lambda x: x[..., 2], name='restore')(inputs)
-
-img_ft = backbone(img_in)
-restore_ft = backbone(restore_in)
-
-img_ft = BatchNormalization()(img_ft)
-img_ft = Activation('swish')(img_ft)
-
-restore_ft = BatchNormalization()(restore_ft)
-restore_ft = Activation('swish')(restore_ft)
-
-x = tf.abs(img_ft - restore_ft)
-x = Conv2D(1024, 3, padding='same')(x)
-x = BatchNormalization()(x)
-x = Activation('swish')(x)
-
-img_ft = Conv2D(1024, 3, padding='same')(img_ft)
-img_ft = BatchNormalization()(img_ft)
-img_ft = Activation('swish')(img_ft)
-
-gpooling = concatenate([img_ft, x])
-gpooling = GlobalAveragePooling2D()(gpooling)
-gpooling = Dropout(0.2)(gpooling)
-output = Dense(NUM_CLASSES, activation='softmax',
-               kernel_regularizer='l2')(gpooling)
-
-MODEL_NAME = 'convnext_base'
-classifier = Model(inputs, output, name=MODEL_NAME)
-
-classifier.load_weights('./weights_3cls/convnext_base_best_loss.h5')
-classifier.trainable = False
-
 
 def classify(image):
-    return classifier.predict(np.expand_dims(image, axis=0)).squeeze()
+    return Classifier().predict(np.expand_dims(image, axis=0)).squeeze()
 
 def make_json_response_with_status(images_dict, probabilities, error, status_code):
     response = jsonify({

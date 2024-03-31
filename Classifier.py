@@ -304,3 +304,39 @@ main_model = get_by_backbone(backbone='convnextb',
 backbone = main_model.get_layer('convnext_base')
 
 input_shape = (224, 224, 1)
+
+def Classifier():
+    inputs = Input(shape=(224, 224, 3))
+    img_in = Lambda(lambda x: (x[..., 0]), name='img')(inputs)
+    restore_in = Lambda(lambda x: x[..., 2], name='restore')(inputs)
+
+    img_ft = backbone(img_in)
+    restore_ft = backbone(restore_in)
+
+    img_ft = BatchNormalization()(img_ft)
+    img_ft = Activation('swish')(img_ft)
+
+    restore_ft = BatchNormalization()(restore_ft)
+    restore_ft = Activation('swish')(restore_ft)
+
+    x = tf.abs(img_ft - restore_ft)
+    x = Conv2D(1024, 3, padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Activation('swish')(x)
+
+    img_ft = Conv2D(1024, 3, padding='same')(img_ft)
+    img_ft = BatchNormalization()(img_ft)
+    img_ft = Activation('swish')(img_ft)
+
+    gpooling = concatenate([img_ft, x])
+    gpooling = GlobalAveragePooling2D()(gpooling)
+    gpooling = Dropout(0.2)(gpooling)
+    output = Dense(NUM_CLASSES, activation='softmax',
+                kernel_regularizer='l2')(gpooling)
+
+    MODEL_NAME = 'convnext_base'
+    classifier = Model(inputs, output, name=MODEL_NAME)
+
+    classifier.load_weights('./weights_3cls/convnext_base_best_loss.h5')
+    classifier.trainable = False
+    return classifier
