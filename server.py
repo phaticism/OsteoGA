@@ -6,14 +6,6 @@ import torch
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
 from Classifier import Classifier
-from tensorflow.keras.layers import (
-    Dense, Flatten, Conv2D, Activation, BatchNormalization,
-    MaxPooling2D, AveragePooling2D, GlobalAveragePooling2D, Lambda,
-    Dropout, Input, concatenate, add, Conv2DTranspose,
-    SpatialDropout2D, Cropping2D, UpSampling2D, LeakyReLU,
-    ZeroPadding2D, Reshape, Concatenate, Multiply, Permute, Add
-)
-from tensorflow.keras.models import Model
 
 from skimage.filters import gaussian
 from flask import Flask, request, make_response, jsonify
