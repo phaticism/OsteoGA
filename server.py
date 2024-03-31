@@ -96,11 +96,19 @@ classifier.trainable = False
 def classify(image):
     return classifier.predict(np.expand_dims(image, axis=0)).squeeze()
 
+def make_json_response(images_dict, probabilities, error):
+    return jsonify({
+        'images': images_dict,
+        'probabilities': probabilities.tolist(),
+        'error': error,
+    })
+
 
 @app.route('/predict', methods=['POST'])
 @cross_origin()
 def predict():
     logger.info(f'Request received: {request.json["image"][-10:]}')
+    images_dict = dict()
 
     if 'crop' not in request.json:
         request.json['crop'] = 'false'
@@ -117,7 +125,7 @@ def predict():
 
             if len(bboxes) == 0:
                 logger.info('No object detected!')
-                return make_response(jsonify({'error': 'No object detected'}), 400)
+                return make_response(make_json_response(images_dict, [], 'no_object_detected'), 500)
             coordinates = []
             for object in bboxes:
                 coordinates.append([int(object[0]), int(
@@ -129,6 +137,7 @@ def predict():
 
             cropped_str = b64encode(cv2.imencode(
                 '.png', cropped_image)[1]).decode()
+            images_dict['cropped'] = cropped_str
 
             original = cropped_image
             img_bytes = b64decode(cropped_str)
@@ -139,15 +148,16 @@ def predict():
         original = preprocess(cv2.resize(original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Invalid input format'}), 400)
+        return make_response(make_json_response(images_dict, [], 'invalid_input_format'), 500)
     
     # perform segmentation
     try:
         segmented_img = cv2.resize(segment(img_bytes, combine=True), (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST)
         segmented_str = b64encode(cv2.imencode('.png', segmented_img)[1]).decode()
+        images_dict['segmented'] = segmented_str
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Segmentation failed'}), 500)
+        return make_response(make_json_response(images_dict, [], 'segmentation_failed'), 500)
 
     # get contours
     try:
@@ -158,9 +168,10 @@ def predict():
         ok, buffer = cv2.imencode(".png", (mask * 255).astype('uint8'))
         if ok:
             contour_str = b64encode(buffer).decode()
+            images_dict['contour'] = contour_str
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Contour extraction failed'}), 500)
+        return make_response(make_json_response(images_dict, [], 'contour_extraction_failed'), 500)
 
     # create masked image
     try:
@@ -169,19 +180,22 @@ def predict():
         ok, buffer = cv2.imencode(".png", (dilated * 255).astype('uint8'))
         if ok:
             dilated_str = b64encode(buffer).decode()
+            images_dict['dilated'] = dilated_str
         
         blurred = gaussian(dilated, sigma=50, truncate=0.3)
         ok, buffer = cv2.imencode(".png", (blurred * 255).astype('uint8'))
         if ok:
             blurred_str = b64encode(buffer).decode()
+            images_dict['blurred'] = blurred_str
 
         masked_img = original * (1 - blurred)
         ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
         if ok:
             masked_str = b64encode(buffer).decode()
+            images_dict['masked'] = masked_str
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Masking failed'}), 500)
+        return make_response(make_json_response(images_dict, [], 'masking_failed'), 500)
 
     # restore masked image using generator
     try:
@@ -191,54 +205,31 @@ def predict():
         ok, buffer = cv2.imencode(".png", (restored_img * 255).numpy().astype('uint8'))
         if ok:
             restored_str = b64encode(buffer).decode()
+            images_dict['restored'] = restored_str
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Restoration failed'}), 500)
+        return make_response(make_json_response(images_dict, [], 'restoration_failed'), 500)
 
     # evaluate anomaly map
     try:
         anomaly_map = blurred * tf.abs(original - restored_img)
         plt.imsave('anomaly.png', anomaly_map, cmap='turbo', vmax=0.7)
         anomaly_str = b64encode(open('anomaly.png', 'rb').read()).decode()
+        images_dict['anomaly'] = anomaly_str
         os.remove('anomaly.png')
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Anomaly map evaluation failed'}), 500)
+        return make_response(make_json_response(images_dict, [], 'anomaly_map_failed'), 500)
     
     # classify the restored image
     try:
         probabilities = classify(np.stack((original, original, restored_img), axis=-1))
     except Exception as e:
         logger.error(e)
-        return make_response(jsonify({'error': 'Classification failed'}), 500)
+        return make_response(make_json_response(images_dict, probabilities, 'classification_failed'), 500)
     
     logger.info('Request processed successfully!')
-    if request.json['crop'] == 'true':
-        return jsonify({
-            'images': {
-                'cropped': cropped_str,
-                'segmented': segmented_str,
-                'contour': contour_str,
-                'dilated': dilated_str,
-                'blurred': blurred_str,
-                'masked': masked_str,
-                'restored': restored_str,
-                'anomaly': anomaly_str,
-            },
-            'probabilities': probabilities.tolist(),
-        })
-    return jsonify({
-        'images': {
-            'segmented': segmented_str,
-            'contour': contour_str,
-            'dilated': dilated_str,
-            'blurred': blurred_str,
-            'masked': masked_str,
-            'restored': restored_str,
-            'anomaly': anomaly_str,
-        },
-        'probabilities': probabilities.tolist(),
-    })
+    return make_response(make_json_response(images_dict, probabilities, None), 200)
 
 
 if __name__ == '__main__':
