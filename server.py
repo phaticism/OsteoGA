@@ -63,6 +63,11 @@ def make_json_response_with_status(images_dict, probabilities, error, status_cod
     })
     return make_response(response, status_code)
 
+@app.route('/')
+@cross_origin()
+def index():
+    return 'Server is running!'
+
 
 @app.route('/predict', methods=['POST'])
 @cross_origin()
