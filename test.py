@@ -5,13 +5,17 @@ import cv2
 import os
 import numpy as np
 
-img = cv2.imread('my_image.png')
+img = cv2.imread('archive/train/0/9007904L.png')
 # convert to grayscale
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 
 # Send it to the server
-r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'true'})
+r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'false', 'clinical': {
+    'age': 50,
+    'max_weight': 100,
+    'bmi': 20
+}})
 
 # read the return value when code 400
 if r.status_code != 200:
@@ -19,9 +23,13 @@ if r.status_code != 200:
 else:
     # Read the response
     response = r.json()
+    print(response)
     imgs = response['images']
     print('Probabilities:', response['probabilities'])
+    print()
     print('Error:', response['error'])
+    print()
+    print("Results:", response['results'])
 
     image_names = ['cropped', 'segmented', 'contour', 'dilated', 'blurred', 'masked', 'restored', 'anomaly']
 

@@ -7,6 +7,7 @@ debug/
 archive/
 
 weights_3cls/
+weights_5cls/
 weights_gae/
 weights_yolo/
 yolov5/

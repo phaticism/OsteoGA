@@ -1,4 +1,4 @@
-tensorflow==2.13.0
+tensorflow==2.15.0
 keras_cv~=0.5.0
 keras-core
 opencv-python

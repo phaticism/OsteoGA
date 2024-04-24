@@ -5,17 +5,18 @@ import cv2
 import torch
 from DCGAN import DCGAN, DropBlockNoise
 from Preprocessing import preprocess, segment, dilate, get_contours_v2, draw_points
-from Classifier import Classifier
-
+from NewClassifier import Classifier
 from skimage.filters import gaussian
 from flask import Flask, request, make_response, jsonify
 from flask_cors import CORS, cross_origin
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
+import absl.logging
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+absl.logging.set_verbosity(absl.logging.ERROR)
+
 
 logger = logging.getLogger('app')
 logger.setLevel(logging.INFO)
@@ -51,17 +52,19 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 app.config['CORS_HEADERS'] = 'Content-Type'
 
 
-def classify(image):
-    return Classifier().predict(np.expand_dims(image, axis=0)).squeeze()
+classifier = Classifier('weights_5cls/svc.pkl',
+                        'weights_5cls/efficientnetv2s-subset.weights.h5')
 
 
-def make_json_response_with_status(images_dict, probabilities, error, status_code):
+def make_json_response_with_status(images_dict, probabilities, error, status_code, results=None):
     response = jsonify({
         'images': images_dict,
-        'probabilities': probabilities.tolist() if probabilities is not None else [],
+        'probabilities': probabilities if probabilities is not None else [],
+        'results': results if results is not None else {},
         'error': error,
     })
     return make_response(response, status_code)
+
 
 @app.route('/')
 @cross_origin()
@@ -74,6 +77,15 @@ def index():
 def predict():
     logger.info(f'Request received: {request.json["image"][-10:]}')
     images_dict = dict()
+
+    if 'clinical' not in request.json\
+            or 'age' not in request.json['clinical']\
+            or 'bmi' not in request.json['clinical']\
+            or 'max_weight' not in request.json['clinical']:
+        return make_json_response_with_status(images_dict, [], 'missing_clinical_data', 500)
+    age = request.json['clinical']['age']
+    bmi = request.json['clinical']['bmi']
+    max_weight = request.json['clinical']['max_weight']
 
     if 'crop' not in request.json:
         request.json['crop'] = 'false'
@@ -110,6 +122,7 @@ def predict():
         # convert to grayscale if necessary
         if len(original.shape) == 3 and original.shape[2] == 3:
             original = cv2.cvtColor(original, cv2.COLOR_BGR2GRAY)
+        original_classification = original.copy()
         original = preprocess(cv2.resize(
             original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
     except Exception as e:
@@ -195,14 +208,16 @@ def predict():
 
     # classify the restored image
     try:
-        probabilities = classify(
-            np.stack((original, original, restored_img), axis=-1))
+        results = classifier.predict_proba(
+            original_classification, age, max_weight, bmi)
     except Exception as e:
         logger.error(e)
-        return make_json_response_with_status(images_dict, probabilities, 'classification_failed', 500)
+        return make_json_response_with_status(images_dict, [], 'classification_failed', 500)
 
     logger.info('Request processed successfully!')
-    return make_json_response_with_status(images_dict, probabilities, None, 200)
+    probabilities = results['kl_grade']
+    return make_json_response_with_status(images_dict, probabilities, None, 200, results)
+
 
 def create_object():
     return {
@@ -217,8 +232,10 @@ def create_object():
             'anomaly': ''
         },
         'probabilities': [],
-        'error': None
+        'error': None,
+        'results': {},
     }
+
 
 @app.route('/predictall', methods=['POST'])
 @cross_origin()
@@ -233,6 +250,22 @@ def predictall():
             'length': 0,
             'error': 'invalid_input_format'
         }), 500)
+
+    if 'clinical' not in request.json\
+            or 'age' not in request.json['clinical']\
+            or 'bmi' not in request.json['clinical']\
+            or 'max_weight' not in request.json['clinical']:
+        return make_response(jsonify({
+            'objects': [
+                create_object(),
+                create_object(),
+            ],
+            'length': 0,
+            'error': 'missing_clinical_data'
+        }), 500)
+    age = request.json['clinical']['age']
+    bmi = request.json['clinical']['bmi']
+    max_weight = request.json['clinical']['max_weight']
 
     try:
         img_bytes = b64decode(request.json['image'])  # get image bytes
@@ -267,7 +300,7 @@ def predictall():
             'length': 0,
             'error': 'invalid_input_format'
         }), 500)
-    
+
     objects = []
     for i in range(len(coordinates)):
         object = create_object()
@@ -283,7 +316,8 @@ def predictall():
 
             original = cropped_image
             img_bytes = b64decode(cropped_str)
-        
+
+            original_classification = original.copy()
             original = preprocess(cv2.resize(
                 original, (IMAGE_SIZE, IMAGE_SIZE), cv2.INTER_NEAREST))
         except Exception as e:
@@ -307,7 +341,8 @@ def predictall():
             continue
 
         try:
-            uc, lc = get_contours_v2(segment(img_bytes, combine=False), verbose=0)
+            uc, lc = get_contours_v2(
+                segment(img_bytes, combine=False), verbose=0)
             mask = draw_points(np.zeros((640, 640)).astype(
                 'uint8'), lc, thickness=1, color=WHITE)
             mask = draw_points(mask, uc, thickness=1, color=WHITE)
@@ -339,7 +374,8 @@ def predictall():
                 object['images']['blurred'] = blurred_str
 
             masked_img = original * (1 - blurred)
-            ok, buffer = cv2.imencode(".png", (masked_img * 255).astype('uint8'))
+            ok, buffer = cv2.imencode(
+                ".png", (masked_img * 255).astype('uint8'))
             if ok:
                 masked_str = b64encode(buffer).decode()
                 object['images']['masked'] = masked_str
@@ -354,7 +390,8 @@ def predictall():
             input = tf.convert_to_tensor(np.expand_dims(
                 masked_img, axis=0), dtype=tf.float32)
             restored_img = restoration_model(input)
-            restored_img = tf.squeeze(tf.squeeze(restored_img, axis=-1), axis=0)
+            restored_img = tf.squeeze(
+                tf.squeeze(restored_img, axis=-1), axis=0)
             ok, buffer = cv2.imencode(
                 ".png", (restored_img * 255).numpy().astype('uint8'))
             if ok:
@@ -381,12 +418,17 @@ def predictall():
             continue
 
         try:
-            probabilities = classify(
-                np.stack((original, original, restored_img), axis=-1))
-            object['probabilities'] = probabilities.tolist()
+            results = classifier.predict_proba(
+                original_classification, age, max_weight, bmi)
+
+            probabilities = results['kl_grade']
+            object['probabilities'] = probabilities
+            object['results'] = results
+            object['error'] = None
         except Exception as e:
             logger.error(e)
             object['probabilities'] = []
+            object['results'] = {}
             object['error'] = 'classification_failed'
             objects.append(object)
             continue
@@ -399,7 +441,6 @@ def predictall():
         'length': len(objects),
         'error': None
     }), 200)
-    
 
 
 if __name__ == '__main__':
