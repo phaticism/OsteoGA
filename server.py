@@ -80,11 +80,12 @@ def predict():
 
     if 'clinical' not in request.json\
             or 'age' not in request.json['clinical']\
-            or 'bmi' not in request.json['clinical']\
+            or 'height' not in request.json['clinical']\
+            or 'weight' not in request.json['clinical']\
             or 'max_weight' not in request.json['clinical']:
         return make_json_response_with_status(images_dict, [], 'missing_clinical_data', 500)
     age = request.json['clinical']['age']
-    bmi = request.json['clinical']['bmi']
+    bmi = request.json['clinical']['weight'] / (request.json['clinical']['height'] / 100)**2
     max_weight = request.json['clinical']['max_weight']
 
     if 'crop' not in request.json:
@@ -253,7 +254,8 @@ def predictall():
 
     if 'clinical' not in request.json\
             or 'age' not in request.json['clinical']\
-            or 'bmi' not in request.json['clinical']\
+            or 'height' not in request.json['clinical']\
+            or 'weight' not in request.json['clinical']\
             or 'max_weight' not in request.json['clinical']:
         return make_response(jsonify({
             'objects': [
@@ -264,7 +266,7 @@ def predictall():
             'error': 'missing_clinical_data'
         }), 500)
     age = request.json['clinical']['age']
-    bmi = request.json['clinical']['bmi']
+    bmi = request.json['clinical']['weight'] / (request.json['clinical']['height'] / 100)**2
     max_weight = request.json['clinical']['max_weight']
 
     try:

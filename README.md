@@ -53,8 +53,8 @@ The request should be a JSON object with the following properties:
 - `crop`: A string that indicates whether the image should be cropped or not. This is an optional field. If not provided, it defaults to `"false"`. If provided, it should be either `"true"` or `"false"`.
 - `clinical`: A JSON object that contains the clinical data. This is a required field and should have the following properties:
   - `age`: The age of the patient. This is a required field.
-  - `max_weight`: The maximum weight (in kg) of the patient. This is a required field.
-  - `bmi`: The Body Mass Index (BMI) of the patient. This is a required field.
+  - `max_weight`, `weight`: The maximum weight and current weight (in kg) of the patient. These are required fields.
+  - `height`: The height of the patient, measured in centimeters. This is a required field.
 
 Example:
 
@@ -64,7 +64,8 @@ Example:
     "clinical": {
         "age": 70,
         "max_weight": 100,
-        "bmi": 25
+        "height": 175,
+        "weight": 75
     },
     "crop": "true"
 }
@@ -139,8 +140,8 @@ The request should be a JSON object with the following properties:
 - `image`: A base64 encoded string of the image to be processed. This is a required field.
 - `clinical`: A JSON object that contains the clinical data. This is a required field and should have the following properties:
   - `age`: The age of the patient. This is a required field.
-  - `max_weight`: The maximum weight (in kg) of the patient. This is a required field.
-  - `bmi`: The Body Mass Index (BMI) of the patient. This is a required field.
+  - `max_weight`, `weight`: The maximum weight and current weight (in kg) of the patient. These are required fields.
+  - `height`: The height of the patient, measured in centimeters. This is a required field.
 
 Example:
 
@@ -150,8 +151,9 @@ Example:
     "clinical": {
         "age": 70,
         "max_weight": 100,
-        "bmi": 25
-    }
+        "height": 175,
+        "weight": 75
+    },
 }
 ```
 

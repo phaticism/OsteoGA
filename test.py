@@ -14,7 +14,8 @@ img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'false', 'clinical': {
     'age': 50,
     'max_weight': 100,
-    'bmi': 20
+    'height': 175,
+    'weight': 70,
 }})
 
 # read the return value when code 400
