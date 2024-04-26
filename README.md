@@ -79,6 +79,8 @@ The response will be a JSON object with the following properties:
 
 * `probabilities`: A list of probabilities resulting from the classification of the restored image. If an error occurred during the classification, this will be an empty list.
 
+* `explanation_image_html`: ...
+
 * `error`: A string that describes the error that occurred during the processing of the image. If no error occurred, this will be `null`.
 
 * `results`: A dictionary that contains the classification results. It has the following keys:
@@ -169,6 +171,7 @@ The response will be a JSON object with the following properties:
         - `kl_grade`: A list of probabilities for the Kellgren-Lawrence (KL) grade classification.
         - `jsn = ['jsn_def', 'jsn_mild/mod', 'jsn_none', 'jsn_severe']`: A list of probabilities for the joint space narrowing (JSN) classification.
         - `osteophytes = ['osteophytes_def','osteophytes_none', 'osteophytes_poss']`: A list of probabilities for the osteophytes classification.
+    * `explanation_image_html`: ...
     * For example:
     ```json
         "results": {

@@ -56,9 +56,10 @@ classifier = Classifier('weights_5cls/svc.pkl',
                         'weights_5cls/efficientnetv2s-subset.weights.h5')
 
 
-def make_json_response_with_status(images_dict, probabilities, error, status_code, results=None):
+def make_json_response_with_status(images_dict, probabilities, error, status_code, results=None, explanation_image=None):
     response = jsonify({
         'images': images_dict,
+        'explanation_image_html': explanation_image if explanation_image is not None else '',
         'probabilities': probabilities if probabilities is not None else [],
         'results': results if results is not None else {},
         'error': error,
@@ -209,7 +210,7 @@ def predict():
 
     # classify the restored image
     try:
-        results = classifier.predict_proba(
+        results, explain_image_html = classifier.predict_proba(
             original_classification, age, max_weight, bmi)
     except Exception as e:
         logger.error(e)
@@ -217,7 +218,7 @@ def predict():
 
     logger.info('Request processed successfully!')
     probabilities = results['kl_grade']
-    return make_json_response_with_status(images_dict, probabilities, None, 200, results)
+    return make_json_response_with_status(images_dict, probabilities, None, 200, results, explain_image_html)
 
 
 def create_object():
@@ -230,7 +231,8 @@ def create_object():
             'blurred': '',
             'masked': '',
             'restored': '',
-            'anomaly': ''
+            'anomaly': '',
+            'explanation_image_html': '',
         },
         'probabilities': [],
         'error': None,
@@ -420,12 +422,13 @@ def predictall():
             continue
 
         try:
-            results = classifier.predict_proba(
+            results, explain_image = classifier.predict_proba(
                 original_classification, age, max_weight, bmi)
 
             probabilities = results['kl_grade']
             object['probabilities'] = probabilities
             object['results'] = results
+            object['explanation_image_html'] = explain_image
             object['error'] = None
         except Exception as e:
             logger.error(e)

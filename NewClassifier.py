@@ -6,6 +6,9 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import pickle
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.compose import ColumnTransformer
+import base64
 from tensorflow.keras.applications import (
     Xception, EfficientNetV2S
 )
@@ -39,6 +42,72 @@ BACKBONES = {
     'xception': Xception,
     'efficientnetv2s': EfficientNetV2S
 }
+
+WORKING_DIR = 'clinical/'
+
+clinical_file = os.path.join(WORKING_DIR, 'clinical-2.csv')
+clinical = pd.read_csv(clinical_file)
+del clinical['ID']
+del clinical['SIDE']
+
+# columns_to_scale = ['AGE', 'HEIGHT', 'WEIGHT', 'MAX WEIGHT', 'BMI', 'KOOS PAIN SCORE']
+# clinical[columns_to_scale] = scaler.fit_transform(clinical[columns_to_scale])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('scale', MinMaxScaler(), ['AGE', 'MAX WEIGHT', 'BMI'])
+    ],
+    remainder='passthrough',
+    n_jobs=-1,
+)
+
+columns_to_convert = ['FREQUENT PAIN', 'SURGERY', 'RISK',
+                      'SXKOA', 'SWELLING', 'BENDING FULLY', 'SYMPTOMATIC', 'CREPITUS']
+mapping_dict = {}
+
+for column in columns_to_convert:
+    clinical[column], unique_values = pd.factorize(clinical[column])
+    mapping_dict[column] = unique_values
+
+train_dir = os.path.join(WORKING_DIR, 'original/df_train.csv')
+df_train = pd.read_csv(train_dir).dropna()
+
+test_dir = os.path.join(WORKING_DIR, 'original/df_test.csv')
+df_test = pd.read_csv(test_dir).dropna()
+
+val_dir = os.path.join(WORKING_DIR, 'original/df_val.csv')
+df_val = pd.read_csv(val_dir).dropna()
+
+df_train = df_train.merge(clinical, left_on='filename', right_on='FILENAME',
+                          how='left').drop(columns=['FILENAME']).dropna()
+df_test = df_test.merge(clinical, left_on='filename', right_on='FILENAME',
+                        how='left').drop(columns=['FILENAME']).dropna()
+df_val = df_val.merge(clinical, left_on='filename', right_on='FILENAME',
+                      how='left').drop(columns=['FILENAME']).dropna()
+
+X_train = df_train.iloc[:, 3:]
+y_train = df_train['kl_grade']
+
+X_val = df_val.iloc[:, 3:]
+y_val = df_val['kl_grade']
+
+X_test = df_test.iloc[:, 3:]
+y_test = df_test['kl_grade']
+
+X_train_np = df_train.iloc[:, 3:].to_numpy()
+y_train_np = df_train['kl_grade'].to_numpy()
+
+X_val_np = df_val.iloc[:, 3:].to_numpy()
+y_val_np = df_val['kl_grade'].to_numpy()
+
+X_test_np = df_test.iloc[:, 3:].to_numpy()
+y_test_np = df_test['kl_grade'].to_numpy()
+
+X_cv = pd.concat([df_train.iloc[:, 3:], df_val.iloc[:, 3:]])
+y_cv = pd.concat([df_train.iloc[:, 1], df_val.iloc[:, 1]])
+
+X_cv_np = X_cv.to_numpy()
+y_cv_np = y_cv.to_numpy()
 
 
 def adjust_pretrained_weights(model_cls, input_size, name=None):
@@ -127,6 +196,21 @@ class Classifier:
             'AGE', 'MAX WEIGHT', 'BMI',
         ]
 
+        from lime.lime_tabular import LimeTabularExplainer
+
+        self.class_names = ['0', '1', '2', '3', '4']
+        self.explainer = LimeTabularExplainer(
+            X_cv[self.features].to_numpy(),
+            feature_names=self.features,
+            training_labels=y_cv_np,
+            mode='classification',
+            class_names=self.class_names,
+            discretize_continuous=True,
+            discretizer='quartile',
+            sample_around_instance=True,
+            random_state=1024,
+        )
+
     def _load_svc(self):
         with open(self.svc_path, 'rb') as f:
             return pickle.load(f)
@@ -151,19 +235,6 @@ class Classifier:
         model.load_weights(self.cnn_weights_path)
         return model
 
-    def predict(self, img, age, max_weight, bmi):
-        img = cv2.resize(img, (224, 224)) / 255.
-        img = np.expand_dims(np.expand_dims(img, axis=-1), axis=0)
-
-        clinical = np.array([age, max_weight, bmi])
-
-        pred = np.squeeze(self.cnn_model.predict(img))
-        vector = np.expand_dims(np.concatenate([pred, clinical]), axis=0)
-
-        y_pred_df = pd.DataFrame(vector, columns=self.names)
-
-        return self.svc.predict(y_pred_df[self.features])
-
     def predict_proba(self, img, age, max_weight, bmi):
         img = cv2.resize(img, (224, 224)) / 255.
         img = np.expand_dims(np.expand_dims(img, axis=-1), axis=0)
@@ -178,12 +249,39 @@ class Classifier:
         kl_grade = np.squeeze(self.svc.predict_proba(
             y_pred_df[self.features])).tolist()
 
+        dataaa = np.squeeze(y_pred_df[self.features].values.reshape(-1, 1))
+        explanation_image_html = self.explain_and_get_image(dataaa)
+
         return {
             "kl_grade": kl_grade,
             "osteophytes": self._df_to_list(y_pred_df[self.osteophytes]),
             "jsn": self._df_to_list(y_pred_df[self.jsn]),
-        }
-    
+        }, explanation_image_html
+
+    def explain_and_get_image(self, input_data):
+        # Generate the explanation
+        exp = self.explainer.explain_instance(
+            input_data,
+            predict_fn=self.predict_proba_df,
+            num_features=10,
+            top_labels=1,
+        )
+        exp.save_to_file('explanation.html')
+
+        with open("explanation.html", "r") as html_file:
+            html_content = html_file.read()
+        os.remove("explanation.html")
+
+        return html_content
+
+    def predict_proba_df(self, input_data):
+        if isinstance(input_data, np.ndarray):
+            if input_data.ndim == 1:
+                input_data = input_data.reshape(1, -1)  # Reshape to 2D array
+            input_data = pd.DataFrame(input_data, columns=self.features)
+        return self.svc.predict_proba(input_data)
+
+
 # classifier = Classifier('weights_5cls/svc.pkl',
 #                         'weights_5cls/efficientnetv2s-subset.weights.h5')
 

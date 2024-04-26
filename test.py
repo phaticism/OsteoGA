@@ -24,7 +24,6 @@ if r.status_code != 200:
 else:
     # Read the response
     response = r.json()
-    print(response)
     imgs = response['images']
     print('Probabilities:', response['probabilities'])
     print()
@@ -36,6 +35,9 @@ else:
 
     if not os.path.exists('debug'):
         os.makedirs('debug')
+
+    with open('debug/explanation.html', 'w') as f:
+        f.write(response['explanation_image_html'])
 
     for image_name in image_names:
         if image_name in imgs:
