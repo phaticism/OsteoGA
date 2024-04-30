@@ -4,6 +4,8 @@
 venv/
 debug/
 
+.idea/
+
 archive/
 
 weights_3cls/
