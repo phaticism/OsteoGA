@@ -86,7 +86,8 @@ def predict():
             or 'max_weight' not in request.json['clinical']:
         return make_json_response_with_status(images_dict, [], 'missing_clinical_data', 500)
     age = request.json['clinical']['age']
-    bmi = request.json['clinical']['weight'] / (request.json['clinical']['height'] / 100)**2
+    bmi = request.json['clinical']['weight'] / \
+        (request.json['clinical']['height'] / 100)**2
     max_weight = request.json['clinical']['max_weight']
 
     if 'crop' not in request.json:
@@ -268,7 +269,8 @@ def predictall():
             'error': 'missing_clinical_data'
         }), 500)
     age = request.json['clinical']['age']
-    bmi = request.json['clinical']['weight'] / (request.json['clinical']['height'] / 100)**2
+    bmi = request.json['clinical']['weight'] / \
+        (request.json['clinical']['height'] / 100)**2
     max_weight = request.json['clinical']['max_weight']
 
     try:
@@ -444,6 +446,68 @@ def predictall():
     return make_response(jsonify({
         'objects': objects,
         'length': len(objects),
+        'error': None
+    }), 200)
+
+
+@app.route('/crop', methods=['POST'])
+@cross_origin()
+def crop():
+    # crop all objects in the image
+    if 'image' not in request.json:
+        return make_response(jsonify({
+            'cropped': [],
+            'length': 0,
+            'error': 'invalid_input_format'
+        }), 500)
+
+    try:
+        img_bytes = b64decode(request.json['image'])  # get image bytes
+        original = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), -1)
+        original_copy = original.copy()
+
+        results = extraction_model(original)
+        bboxes = results.pandas().xyxy[0].values.tolist()
+
+        if len(bboxes) == 0:
+            logger.info('No object detected!')
+            return make_response(jsonify({
+                'cropped': [],
+                'length': 0,
+                'error': 'no_object_detected'
+            }), 500)
+        coordinates = []
+        for object in bboxes:
+            coordinates.append([int(object[0]), int(
+                object[1]), int(object[2]), int(object[3])])
+        print(len(coordinates))
+    except Exception as e:
+        logger.error(e)
+        return make_response(jsonify({
+            'cropped': [],
+            'length': 0,
+            'error': 'invalid_input_format'
+        }), 500)
+
+    cropped = []
+    for i in range(len(coordinates)):
+        try:
+            x1, y1, x2, y2 = coordinates[i][0:4]
+            cropped_image = original[y1:y2, x1:x2, ...]
+            cropped_image = cv2.resize(cropped_image, (224, 224))
+
+            cropped_str = b64encode(cv2.imencode(
+                '.png', cropped_image)[1]).decode()
+            cropped.append(cropped_str)
+        except Exception as e:
+            logger.error(e)
+            cropped.append(None)
+            continue
+
+    logger.info('Request processed successfully!')
+    return make_response(jsonify({
+        'cropped': cropped,
+        'length': len(cropped),
         'error': None
     }), 200)
 
