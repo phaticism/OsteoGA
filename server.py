@@ -59,7 +59,6 @@ classifier = Classifier('weights_5cls/svc.pkl',
 def make_json_response_with_status(images_dict, probabilities, error, status_code, results=None, explanation_image=None):
     response = jsonify({
         'images': images_dict,
-        'explanation_image_html': explanation_image if explanation_image is not None else '',
         'probabilities': probabilities if probabilities is not None else [],
         'results': results if results is not None else {},
         'error': error,
@@ -219,6 +218,7 @@ def predict():
 
     logger.info('Request processed successfully!')
     probabilities = results['kl_grade']
+    images_dict['explanation'] = explain_image_html
     return make_json_response_with_status(images_dict, probabilities, None, 200, results, explain_image_html)
 
 
@@ -233,7 +233,7 @@ def create_object():
             'masked': '',
             'restored': '',
             'anomaly': '',
-            'explanation_image_html': '',
+            'explanation': '',
         },
         'probabilities': [],
         'error': None,
@@ -430,7 +430,7 @@ def predictall():
             probabilities = results['kl_grade']
             object['probabilities'] = probabilities
             object['results'] = results
-            object['explanation_image_html'] = explain_image
+            object['images']['explanation'] = explain_image
             object['error'] = None
         except Exception as e:
             logger.error(e)

@@ -17,6 +17,7 @@ from tensorflow.keras.layers import (
     Dense, GlobalAveragePooling2D, Lambda,
     Dropout, Input, concatenate, add, Conv2DTranspose,
 )
+import matplotlib.pyplot as plt
 from tensorflow.keras.optimizers import Adam
 import absl.logging
 import os
@@ -264,15 +265,21 @@ class Classifier:
             input_data,
             predict_fn=self.predict_proba_df,
             num_features=10,
-            top_labels=1,
+            top_labels=5,
         )
-        exp.save_to_file('explanation.html')
+        # get maximum probability class
+        max_prob_class = self.class_names[np.argmax(
+            self.predict_proba_df(input_data))]
+        fig = exp.as_pyplot_figure(label=int(max_prob_class))
+        fig.set_dpi(300)
+        fig.set_size_inches(18, 10)
+        # transform to byte64 string
+        fig.savefig('explanation.png')
+        plt.close(fig)
+        with open('explanation.png', 'rb') as f:
+            img_str = base64.b64encode(f.read()).decode()
 
-        with open("explanation.html", "r") as html_file:
-            html_content = html_file.read()
-        os.remove("explanation.html")
-
-        return html_content
+        return img_str
 
     def predict_proba_df(self, input_data):
         if isinstance(input_data, np.ndarray):

@@ -31,13 +31,10 @@ else:
     print()
     print("Results:", response['results'])
 
-    image_names = ['cropped', 'segmented', 'contour', 'dilated', 'blurred', 'masked', 'restored', 'anomaly']
+    image_names = ['cropped', 'segmented', 'contour', 'dilated', 'blurred', 'masked', 'restored', 'anomaly', 'explanation']
 
     if not os.path.exists('debug'):
         os.makedirs('debug')
-
-    with open('debug/explanation.html', 'w') as f:
-        f.write(response['explanation_image_html'])
 
     for image_name in image_names:
         if image_name in imgs:

@@ -31,7 +31,7 @@ else:
     print("="*50)
 
     image_names = ['cropped', 'segmented', 'contour',
-                   'dilated', 'blurred', 'masked', 'restored', 'anomaly',]
+                   'dilated', 'blurred', 'masked', 'restored', 'anomaly', 'explanation']
 
     if not os.path.exists('debug'):
         os.makedirs('debug')
@@ -45,8 +45,7 @@ else:
         print()
         imgs = obj['images']
 
-        with open(f'debug/explanation_{i+1}.html', 'w') as f:
-            f.write(obj['explanation_image_html'])
+    
         for image_name in image_names:
             if image_name in imgs:
                 img_data = base64.b64decode(imgs[image_name])
