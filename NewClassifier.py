@@ -279,6 +279,8 @@ class Classifier:
         with open('explanation.png', 'rb') as f:
             img_str = base64.b64encode(f.read()).decode()
 
+        os.remove('explanation.png')
+
         return img_str
 
     def predict_proba_df(self, input_data):

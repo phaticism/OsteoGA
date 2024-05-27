@@ -315,6 +315,7 @@ def predictall():
             x1, y1, x2, y2 = coordinates[i][0:4]
             cropped_image = original[y1:y2, x1:x2, ...]
             cropped_image = cv2.resize(cropped_image, (224, 224))
+            cropped_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
 
             cropped_str = b64encode(cv2.imencode(
                 '.png', cropped_image)[1]).decode()
