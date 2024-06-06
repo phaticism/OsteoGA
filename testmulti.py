@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 img = cv2.imread(
-    'test_images/diagnostic-imaging-x-ray-knee-east-melbourne.jpg')
+    'test_images/ac482d9c835c6b4c003dc7004fab8c_gallery.jpeg')
 # convert to grayscale
 # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()

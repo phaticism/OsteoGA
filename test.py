@@ -5,17 +5,17 @@ import cv2
 import os
 import numpy as np
 
-img = cv2.imread('archive/train/0/9007904L.png')
+img = cv2.imread('archive/test/1/9001400L.png')
 # convert to grayscale
 img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 img_str = base64.b64encode(cv2.imencode('.png', img)[1]).decode()
 
 # Send it to the server
 r = requests.post('http://localhost:8000/predict', json={'image': img_str, 'crop': 'false', 'clinical': {
-    'age': 50,
-    'max_weight': 100,
-    'height': 175,
-    'weight': 70,
+    'age': 75,
+    'max_weight': 58.5,
+    'height': 155.5,
+    'weight': 56.8,
 }})
 
 # read the return value when code 400
